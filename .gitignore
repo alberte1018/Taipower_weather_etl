@@ -1,0 +1,14 @@
+# 真正的金鑰檔，不進版控
+.env
+
+# 執行後自動產生的東西
+output/
+cache/
+township_resource_map.json
+
+# Python
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
