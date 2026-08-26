@@ -14,15 +14,22 @@
 ```bash
 # 1. 安裝套件（Python 3.9 以上）
 pip install -r requirements.txt
+# 若系統同時裝有 Python 2/3、pip 預設指向 Python 2，請改用：
+pip3 install -r requirements.txt
 
 # 2. 設定金鑰（.env.example 已內建可直接用的 CWA 示範金鑰；LLM_API_KEY 由講師另外提供，填入 .env）
+# 若無.env.example檔案則需手動新增 .env
 cp .env.example .env
 
+
 # 3. 執行——兩支互相獨立，需要哪支就跑哪支
-python typhoon_warning_etl.py        # 颱風警報，1 次 API 呼叫，幾秒完成
-python township_wind_rain_etl.py     # 全台鄉鎮風速/雨量，22 次 CWA + 22 次 LLM，首次約 3-5 分鐘
+# 大多數 macOS/Linux 環境預設只有 python3（沒有 python 指令），Windows 則通常兩者皆有；
+# 若不確定，先試 python3，指令找不到再改用 python。
+python3 typhoon_warning_etl.py        # 颱風警報，1 次 API 呼叫，幾秒完成
+python3 township_wind_rain_etl.py     # 全台鄉鎮風速/雨量，22 次 CWA + 22 次 LLM，首次約 3-5 分鐘
 
 # 4. 結果自動存到 output/ 資料夾，檔名各自帶時間戳記
+
 ```
 
 ⚠️ **網路需求**：兩支都要能連到 `opendata.cwa.gov.tw`；`township_wind_rain_etl.py` 另外要能連到 `bedrock-mantle.us-east-1.api.aws`（LLM Gateway）。如果是企業內網、有出站防火牆或 Proxy，記得先確認這兩個網域有開放，不然程式會卡在連線逾時。
