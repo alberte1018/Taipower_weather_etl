@@ -143,7 +143,14 @@ def _fetch_json_via_curl(url: str, params: dict) -> dict:
     full_url = f"{url}?{urlencode(params)}"
     try:
         result = subprocess.run(
-            ["curl", "-sS", "-X", "GET", full_url, "-H", "accept: application/json"],
+            [
+                "curl", "-sS", "-X", "GET", full_url, "-H", "accept: application/json",
+                # --connect-timeout/--max-time 從很舊的 curl 版本就支援，避免用到
+                # --retry-all-errors 這類較新的旗標（curl 7.71+）在客戶端舊版 curl
+                # 上直接被當成未知選項而失敗；重試交給外層 with_retry 處理就好。
+                "--connect-timeout", "10",
+                "--max-time", "20",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
@@ -178,6 +185,8 @@ def discover_township_forecast_resources() -> dict:
     print("首次執行，探索縣市對照表（約 44 次 API 呼叫，之後會存檔快取，不會重複跑）...")
     found: dict = {}
     for n in range(1, MAX_PROBE + 1, 2):
+        if n > 1:
+            time.sleep(0.5)  # 探測是短時間內連續打 CWA，稍微間隔避免觸發連線不穩定
         resource_id = f"F-D0047-{n:03d}"
         try:
             data = with_retry(fetch_cwa_resource, resource_id)

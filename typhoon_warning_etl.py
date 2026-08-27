@@ -105,7 +105,14 @@ def _fetch_json_via_curl(url: str, params: dict) -> dict:
     full_url = f"{url}?{urlencode(params)}"
     try:
         result = subprocess.run(
-            ["curl", "-sS", "-X", "GET", full_url, "-H", "accept: application/json"],
+            [
+                "curl", "-sS", "-X", "GET", full_url, "-H", "accept: application/json",
+                # --connect-timeout/--max-time 從很舊的 curl 版本就支援，避免用到
+                # --retry-all-errors 這類較新的旗標（curl 7.71+）在客戶端舊版 curl
+                # 上直接被當成未知選項而失敗；重試交給外層 with_retry 處理就好。
+                "--connect-timeout", "10",
+                "--max-time", "20",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
