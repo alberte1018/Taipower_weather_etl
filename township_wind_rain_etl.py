@@ -362,7 +362,12 @@ def main() -> None:
     print("Step 1+2：逐縣市抓取、篩選、LLM 合併...")
     all_results = {}
     total_townships = 0
-    for county_name, resource_id in county_map.items():
+    for i, (county_name, resource_id) in enumerate(county_map.items()):
+        if i > 0:
+            # 縣市之間本來多半會因為要等 LLM 回應而自然有間隔，但當天重跑、
+            # LLM 快取命中時完全不打 LLM，CWA 呼叫會變成緊接著連續打，
+            # 補一點間隔避免變成跟探測階段一樣的密集連續呼叫。
+            time.sleep(0.5)
         print(f"處理 {county_name}（{resource_id}）...")
         location_data = fetch_township_forecast(resource_id)
         townships = location_data.get("Location", [])
