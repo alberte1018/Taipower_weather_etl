@@ -21,9 +21,9 @@ from urllib.parse import urlencode
 
 import jsonschema
 
-# 部分環境（尤其客戶端主機）的 Python 內建 SSL 憑證庫對 CWA/政府憑證鏈
-# 較嚴格而驗證失敗（CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier），
-# 但系統層級（curl 等）驗證正常。改用作業系統原生信任庫可解決此落差；
+# 打 CWA API 那段已經改走系統 curl（見 _fetch_json_via_curl），不經過 Python 內建 SSL，
+# 所以不受下面這個問題影響。但打 LLM Gateway（bedrock-mantle）那段還是用 requests 直連，
+# 部分環境的 Python 內建 SSL 憑證庫可能驗證過嚴而失敗，改用作業系統原生信任庫可解決；
 # 若環境沒裝 truststore（例如 Python < 3.10）則靜默略過，退回原本行為。
 try:
     import truststore
@@ -137,9 +137,9 @@ def with_retry(fn, *args, attempts: int = 3, base_delay_s: float = 2.0, **kwargs
 # ============================================================
 
 def _fetch_json_via_curl(url: str, params: dict) -> dict:
-    """requests（Python 內建 SSL）驗證失敗時的備援：改叫系統 curl 直接發送同一支 GET 請求。
-    curl 走的是系統層級的憑證信任鏈，在部分客戶端主機上比 Python 內建 SSL 寬鬆，
-    能繞開 truststore 都解決不了的憑證鏈驗證問題（見 README「SSL 憑證驗證錯誤」）。"""
+    """直接呼叫系統 curl 發送 GET 請求並解析 JSON 回應，不經過 Python 內建 SSL 驗證。
+    部分客戶端主機的 Python SSL 對 CWA 憑證鏈驗證過嚴（見 README「SSL 憑證驗證錯誤」），
+    curl 走系統層級驗證，穩定能通，所以打 CWA API 一律直接用 curl。"""
     full_url = f"{url}?{urlencode(params)}"
     try:
         result = subprocess.run(
@@ -150,25 +150,19 @@ def _fetch_json_via_curl(url: str, params: dict) -> dict:
             check=True,
         )
     except FileNotFoundError as exc:
-        raise RuntimeError("curl 備援呼叫失敗：系統找不到 curl 指令") from exc
+        raise requests.exceptions.ConnectionError("系統找不到 curl 指令") from exc
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise RuntimeError(f"curl 備援呼叫失敗：{exc}") from exc
+        raise requests.exceptions.ConnectionError(f"curl 呼叫失敗：{exc}") from exc
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
-        raise RuntimeError(f"curl 備援呼叫回傳非 JSON：{result.stdout[:200]}") from exc
+        raise requests.exceptions.ConnectionError(f"curl 回傳非 JSON：{result.stdout[:200]}") from exc
 
 
 def fetch_cwa_resource(resource_id: str) -> dict:
     url = f"{CWA_DATASTORE_BASE}/{resource_id}"
     params = {"Authorization": CWA_API_KEY, "format": "JSON"}
-    try:
-        resp = requests.get(url, params=params, timeout=30)
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.exceptions.SSLError as exc:
-        print(f"  [SSL] requests 驗證失敗（{exc}），改用系統 curl 重試...")
-        data = _fetch_json_via_curl(url, params)
+    data = _fetch_json_via_curl(url, params)
     if data.get("success") != "true":  # CWA 回傳的 success 是字串，不是布林
         raise RuntimeError(f"{resource_id} 呼叫失敗：{data}")
     return data
