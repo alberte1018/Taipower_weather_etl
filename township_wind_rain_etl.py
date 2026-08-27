@@ -182,11 +182,13 @@ def discover_township_forecast_resources() -> dict:
         with open(RESOURCE_MAP_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    print("首次執行，探索縣市對照表（約 44 次 API 呼叫，之後會存檔快取，不會重複跑）...")
+    print("首次執行，探索縣市對照表（約 44 次 API 呼叫、約 1 分鐘，之後會存檔快取，不會重複跑）...")
     found: dict = {}
     for n in range(1, MAX_PROBE + 1, 2):
         if n > 1:
-            time.sleep(0.5)  # 探測是短時間內連續打 CWA，稍微間隔避免觸發連線不穩定
+            # 這段只會成功執行一次（結果會永久快取到 township_resource_map.json），
+            # 慢一點完全不虧，間隔拉大一些換取穩定度，避免短時間連續打同一網域觸發連線不穩定。
+            time.sleep(1.5)
         resource_id = f"F-D0047-{n:03d}"
         try:
             data = with_retry(fetch_cwa_resource, resource_id)
