@@ -176,13 +176,14 @@ def fetch_cwa_resource(resource_id: str) -> dict:
 
 
 def discover_township_forecast_resources() -> dict:
-    """{縣市名: resource_id}，鄉鎮天氣預報「1週逐12小時版」。第一次執行會探測並存檔到
-    township_resource_map.json，之後執行直接讀檔，不會重複打 API。"""
+    """{縣市名: resource_id}，鄉鎮天氣預報「1週逐12小時版」。township_resource_map.json
+    已隨版本提交好探測結果，一般情況下這裡會直接讀檔命中；只有這個檔案不存在或被刪掉時
+    （例如 CWA 哪天改了編號規則），才會重新探測並存回這個檔案。"""
     if RESOURCE_MAP_PATH.exists():
         with open(RESOURCE_MAP_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
 
-    print("首次執行，探索縣市對照表（約 44 次 API 呼叫、約 1 分鐘，之後會存檔快取，不會重複跑）...")
+    print("找不到縣市對照表，重新探索（約 44 次 API 呼叫、約 1 分鐘，之後會存檔快取，不會重複跑）...")
     found: dict = {}
     for n in range(1, MAX_PROBE + 1, 2):
         if n > 1:

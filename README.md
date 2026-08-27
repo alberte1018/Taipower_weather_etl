@@ -86,7 +86,7 @@ python township_wind_rain_etl.py
 
 - LLM 合併結果存在 `cache/<日期>_<縣市>.json`，**同一天**重跑會直接讀快取、不重打 LLM；**隔天**日期變了自動失效、重新產生。
 - 想強制重跑某個縣市：刪掉 `cache/` 底下對應的檔案即可。
-- 縣市對照表（`township_resource_map.json`）只探測一次、永久快取；如果哪天抓不到資料，把這個檔案刪掉重新探測。
+- 縣市對照表（`township_resource_map.json`）已經隨版本一起提交、內容是探測好的 22 縣市對照表，**一般情況下不用再探測**（跳過原本約 44 次的探測 API 呼叫，直接進入正式抓資料）；如果哪天 CWA 編號規則變了、抓不到資料，把這個檔案刪掉，程式會自動重新探測並存回這個檔案。
 
 ### 常見問題
 
@@ -181,7 +181,7 @@ township_wind_rain_etl.py    主程式 1，鄉鎮風速/風向/雨量 3天展望
 typhoon_warning_etl.py       主程式 2，颱風警報，可獨立執行
 requirements.txt              兩支程式共用的 Python 套件需求（requests、jsonschema、truststore）
 .env.example                  兩支程式共用的金鑰設定範本（複製成 .env）
-township_resource_map.json    （首次執行 township_wind_rain_etl.py 後自動產生）22縣市對照表快取
+township_resource_map.json    隨版本提交的 22 縣市對照表快取，一般情況免探測；刪掉會在下次執行時自動重新探測產生
 cache/                        （首次執行 township_wind_rain_etl.py 後自動產生）LLM 合併結果快取，依日期+縣市命名
 output/                       （執行後自動產生）兩支程式的最終輸出 JSON，檔名前綴不同不會互相覆蓋
 ```

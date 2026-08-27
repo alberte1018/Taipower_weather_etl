@@ -4,7 +4,9 @@
 # 執行後自動產生的東西
 output/
 cache/
-township_resource_map.json
+
+# township_resource_map.json 不放這裡——改成隨版本一起提交，
+# 讓客戶端主機不用再花 ~44 次探測，直接讀現成的 22 縣市對照表。
 
 # Python
 __pycache__/
