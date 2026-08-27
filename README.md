@@ -34,6 +34,8 @@ python3 township_wind_rain_etl.py     # 全台鄉鎮風速/雨量，22 次 CWA +
 
 ⚠️ **網路需求**：兩支都要能連到 `opendata.cwa.gov.tw`；`township_wind_rain_etl.py` 另外要能連到 `bedrock-mantle.us-east-1.api.aws`（LLM Gateway）。如果是企業內網、有出站防火牆或 Proxy，記得先確認這兩個網域有開放，不然程式會卡在連線逾時。
 
+⚠️ **SSL 憑證驗證錯誤**：部分客戶端主機執行時可能出現 `CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier`——這是 Python 內建 SSL 憑證庫對 CWA 憑證鏈驗證較嚴格所致（`curl` 打同一支 API 通常不受影響）。兩支程式都已內建 `truststore`（見 `requirements.txt`），會自動改用作業系統原生的憑證信任機制來解決這個落差，正常裝好 `requirements.txt` 即可，不需要額外設定；只有在 Python 版本低於 3.10（`truststore` 不支援）時才會退回原本行為、可能重現此錯誤。
+
 ---
 
 ## 金鑰說明
@@ -177,7 +179,7 @@ A: 內容是 CWA 官方公告，發布時要標示資料來源與 `發布單位`
 ```
 township_wind_rain_etl.py    主程式 1，鄉鎮風速/風向/雨量 3天展望，可獨立執行
 typhoon_warning_etl.py       主程式 2，颱風警報，可獨立執行
-requirements.txt              兩支程式共用的 Python 套件需求（requests、jsonschema）
+requirements.txt              兩支程式共用的 Python 套件需求（requests、jsonschema、truststore）
 .env.example                  兩支程式共用的金鑰設定範本（複製成 .env）
 township_resource_map.json    （首次執行 township_wind_rain_etl.py 後自動產生）22縣市對照表快取
 cache/                        （首次執行 township_wind_rain_etl.py 後自動產生）LLM 合併結果快取，依日期+縣市命名

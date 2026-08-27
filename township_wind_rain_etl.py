@@ -18,6 +18,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import jsonschema
+
+# 部分環境（尤其客戶端主機）的 Python 內建 SSL 憑證庫對 CWA/政府憑證鏈
+# 較嚴格而驗證失敗（CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier），
+# 但系統層級（curl 等）驗證正常。改用作業系統原生信任庫可解決此落差；
+# 若環境沒裝 truststore（例如 Python < 3.10）則靜默略過，退回原本行為。
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
 import requests
 
 # ============================================================
