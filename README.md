@@ -34,7 +34,9 @@ python3 township_wind_rain_etl.py     # 全台鄉鎮風速/雨量，22 次 CWA +
 
 ⚠️ **網路需求**：兩支都要能連到 `opendata.cwa.gov.tw`；`township_wind_rain_etl.py` 另外要能連到 `bedrock-mantle.us-east-1.api.aws`（LLM Gateway）。如果是企業內網、有出站防火牆或 Proxy，記得先確認這兩個網域有開放，不然程式會卡在連線逾時。
 
-⚠️ **SSL 憑證驗證錯誤**：部分客戶端主機執行時可能出現 `CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier`——這是 Python 內建 SSL 憑證庫對 CWA 憑證鏈驗證較嚴格所致（`curl` 打同一支 API 通常不受影響）。兩支程式都已內建 `truststore`（見 `requirements.txt`），會自動改用作業系統原生的憑證信任機制來解決這個落差，正常裝好 `requirements.txt` 即可，不需要額外設定；只有在 Python 版本低於 3.10（`truststore` 不支援）時才會退回原本行為、可能重現此錯誤。
+⚠️ **SSL 憑證驗證錯誤**：部分客戶端主機執行時可能出現 `CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier`（有時混雜 `UNEXPECTED_EOF_WHILE_READING`）——這是 Python 內建 SSL 對 CWA 憑證鏈驗證較嚴格所致（`curl` 打同一支 API 通常不受影響）。兩支程式已內建兩層防護：
+1. `truststore`（見 `requirements.txt`）：改用作業系統原生的憑證信任機制，多數情況能解決落差，正常裝好 `requirements.txt` 即可、不需額外設定；Python 版本低於 3.10 時不支援、會靜默退回原本行為。
+2. **curl 備援**：如果 `truststore` 裝了還是遇到同樣的 SSL 錯誤（例如系統 OpenSSL 版本本身對這張憑證鏈判定過嚴，連信任庫都救不了），呼叫 CWA API 那步會自動改叫系統 `curl` 重新發送同一支請求（`curl` 走的驗證邏輯通常較寬鬆）。這需要主機上裝有 `curl` 指令（Linux/macOS 預設都有）；若還是失敗，錯誤訊息會明確標示是 curl 備援本身失敗（而不是原本的 SSL 錯誤），代表連 curl 都連不上，問題出在網路本身（防火牆/DNS）而非憑證。
 
 ---
 

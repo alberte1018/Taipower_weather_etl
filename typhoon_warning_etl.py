@@ -19,10 +19,12 @@ from __future__ import annotations  # 讓下面 `dict | None` 這種型別寫法
 
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 # 部分環境（尤其客戶端主機）的 Python 內建 SSL 憑證庫對 CWA/政府憑證鏈
 # 較嚴格而驗證失敗（CERTIFICATE_VERIFY_FAILED: Missing Subject Key Identifier），
@@ -102,15 +104,40 @@ def with_retry(fn, *args, attempts: int = 3, base_delay_s: float = 2.0, **kwargs
 # Extract：呼叫 CWA
 # ============================================================
 
+def _fetch_json_via_curl(url: str, params: dict) -> dict:
+    """requests（Python 內建 SSL）驗證失敗時的備援：改叫系統 curl 直接發送同一支 GET 請求。
+    curl 走的是系統層級的憑證信任鏈，在部分客戶端主機上比 Python 內建 SSL 寬鬆，
+    能繞開 truststore 都解決不了的憑證鏈驗證問題（見 README「SSL 憑證驗證錯誤」）。"""
+    full_url = f"{url}?{urlencode(params)}"
+    try:
+        result = subprocess.run(
+            ["curl", "-sS", "-X", "GET", full_url, "-H", "accept: application/json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("curl 備援呼叫失敗：系統找不到 curl 指令") from exc
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise RuntimeError(f"curl 備援呼叫失敗：{exc}") from exc
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"curl 備援呼叫回傳非 JSON：{result.stdout[:200]}") from exc
+
+
 def fetch_typhoon_warnings() -> list:
     """回傳 records.info（CAP 格式的警報公告陣列，每個颱風目前追蹤中的最新幾份公告）。"""
-    resp = requests.get(
-        f"{CWA_DATASTORE_BASE}/{RESOURCE_ID}",
-        params={"Authorization": CWA_API_KEY, "format": "JSON"},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    data = resp.json()
+    url = f"{CWA_DATASTORE_BASE}/{RESOURCE_ID}"
+    params = {"Authorization": CWA_API_KEY, "format": "JSON"}
+    try:
+        resp = requests.get(url, params=params, timeout=30)
+        resp.raise_for_status()
+        data = resp.json()
+    except requests.exceptions.SSLError as exc:
+        print(f"  [SSL] requests 驗證失敗（{exc}），改用系統 curl 重試...")
+        data = _fetch_json_via_curl(url, params)
     if data.get("success") != "true":  # CWA 回傳的 success 是字串，不是布林
         raise RuntimeError(f"{RESOURCE_ID} 呼叫失敗：{data}")
     return data.get("records", {}).get("info", [])
